@@ -1,0 +1,8 @@
+# model serving 
+vllm
+
+# CPU metrics
+psutil
+
+# GPU metrics
+nvidia-ml-py3 # Optional: required only if you use the GPU collectors in src/metrics_collector/gpu_metrics.py
