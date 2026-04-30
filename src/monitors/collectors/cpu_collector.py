@@ -1,7 +1,7 @@
 # src/monitors/collectors/cpu_collector.py
 
-from monitors.collectors.base_collector import BaseCollector
-from monitors.process_tracker import get_processes_in_group
+from src.monitors.collectors.base_collector import BaseCollector
+from src.monitors.process_tracker import get_processes_in_group
 import psutil
 
 

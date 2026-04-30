@@ -1,6 +1,6 @@
 # src/monitors/collectors/gpu_collector.py
 
-from monitors.collectors.base_collector import BaseCollector
+from src.monitors.collectors.base_collector import BaseCollector
 
 try:
     import pynvml
