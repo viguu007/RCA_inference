@@ -8,7 +8,7 @@ import urllib.request
 
 
 class VLLMLauncher:
-    def __init__(self, model_name: str, host: str = "127.0.0.1", port: int = 8000):
+    def __init__(self, model_name: str, host: str = "0.0.0.0", port: int = 8000):
         self.model_name = model_name
         self.host = host
         self.port = port
@@ -18,10 +18,8 @@ class VLLMLauncher:
 
     def launch(self):
         cmd = [
-            "python",
-            "-m",
-            "vllm.entrypoints.openai.api_server",
-            "--model",
+            "vllm",
+            "serve",
             self.model_name,
             "--host",
             self.host,
