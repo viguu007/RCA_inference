@@ -43,7 +43,7 @@ def main():
         print("🚀 Launching vLLM...")
         launcher = VLLMLauncher(model_name=MODEL_NAME)
 
-        info = launcher.launch()
+        info = launcher.wait_until_ready()
         pgid = info["pgid"]
 
         print(f"✅ vLLM started | PID={info['pid']} PGID={pgid}\n")

@@ -3,10 +3,12 @@
 import subprocess
 import os
 import signal
+import time
+import urllib.request
 
 
 class VLLMLauncher:
-    def __init__(self, model_name: str, host: str = "0.0.0.0", port: int = 8000):
+    def __init__(self, model_name: str, host: str = "127.0.0.1", port: int = 8000):
         self.model_name = model_name
         self.host = host
         self.port = port
@@ -15,23 +17,23 @@ class VLLMLauncher:
         self.pgid = None
 
     def launch(self):
-        """
-        Launch vLLM server as a subprocess and create a new process group.
-        """
-
         cmd = [
-            "vllm",
-            "serve",
+            "python",
+            "-m",
+            "vllm.entrypoints.openai.api_server",
+            "--model",
             self.model_name,
+            "--host",
+            self.host,
             "--port",
             str(self.port),
         ]
 
         self.process = subprocess.Popen(
             cmd,
-            preexec_fn=os.setsid,   # IMPORTANT: creates new process group
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            preexec_fn=os.setsid,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
 
         self.pid = self.process.pid
@@ -43,28 +45,42 @@ class VLLMLauncher:
             "process": self.process,
         }
 
+    def wait_until_ready(self, timeout=120, interval=2):
+        """
+        Wait until vLLM HTTP server is ready.
+        """
+        url = f"http://{self.host}:{self.port}/v1/models"
+        start = time.time()
+
+        print("⏳ Waiting for vLLM to be ready...")
+
+        while time.time() - start < timeout:
+            # If process died early → fail fast
+            if self.process.poll() is not None:
+                raise RuntimeError("vLLM process exited before becoming ready")
+
+            try:
+                with urllib.request.urlopen(url, timeout=2) as resp:
+                    if resp.status == 200:
+                        print("✅ vLLM is ready\n")
+                        return
+            except Exception:
+                pass
+
+            time.sleep(interval)
+
+        raise TimeoutError("vLLM did not become ready within timeout")
+
     def is_running(self) -> bool:
-        if self.process is None:
-            return False
-        return self.process.poll() is None
+        return self.process and self.process.poll() is None
 
     def stop(self):
-        """
-        Gracefully stop the entire process group.
-        """
-
-        if self.pgid is None:
-            return
-
-        try:
-            # Kill entire process group
-            os.killpg(self.pgid, signal.SIGTERM)
-        except Exception:
-            pass
+        if self.pgid:
+            try:
+                os.killpg(self.pgid, signal.SIGTERM)
+            except Exception:
+                pass
 
     def wait(self):
-        """
-        Wait for process to finish.
-        """
         if self.process:
             self.process.wait()
