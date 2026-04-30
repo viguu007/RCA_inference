@@ -20,7 +20,7 @@ SAMPLING_INTERVAL = 0.1   # 100 ms
 RCA_INTERVAL = 20         # seconds
 WINDOW_SIZE = 20          # seconds
 
-MODEL_NAME = "facebook/opt-125m"  # change if needed
+MODEL_NAME = "babylm/babyllama-100m-2024"  # change if needed
 
 
 def dummy_provenance(features):
@@ -43,7 +43,8 @@ def main():
         print("🚀 Launching vLLM...")
         launcher = VLLMLauncher(model_name=MODEL_NAME)
 
-        info = launcher.wait_until_ready()
+        info = launcher.launch()
+        launcher.wait_until_ready()
         pgid = info["pgid"]
 
         print(f"✅ vLLM started | PID={info['pid']} PGID={pgid}\n")
