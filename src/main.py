@@ -2,7 +2,6 @@
 
 import time
 import os
-import signal
 import sys
 
 from src.monitors.collector import MetricsCollector
@@ -12,27 +11,16 @@ from src.monitors.aggregator import RollingBuffer, Aggregator
 from src.launchers.vllm_launcher import VLLMLauncher
 from src.rca.baseline_model import BaselineModel
 from src.rca.rca_analyzer import RCAAnalyzer
-from src.rca import baseline_model
 
 
 # ---- Config ----
 SAMPLING_INTERVAL = 0.1   # 100 ms
-RCA_INTERVAL = 20         # seconds
-WINDOW_SIZE = 20          # seconds
+RCA_INTERVAL = 10         # seconds
+WINDOW_SIZE = 10          # seconds
 
-MODEL_NAME = "babylm/babyllama-100m-2024"  # change if needed
+BASELINE_DURATION = 120   # 2 minutes (reduce for testing)
 
-
-def dummy_provenance(features):
-    return features
-
-
-def dummy_rca(features):
-    cpu = features.get("cpu", {})
-    if cpu.get("avg_percent", 0) > 80:
-        print("⚠️ RCA: CPU bottleneck detected")
-    else:
-        print("✅ RCA: System healthy")
+MODEL_NAME = "ibm-granite/granite-4.1-3b"
 
 
 def main():
@@ -45,6 +33,7 @@ def main():
 
         info = launcher.launch()
         launcher.wait_until_ready()
+
         pgid = info["pgid"]
 
         print(f"✅ vLLM started | PID={info['pid']} PGID={pgid}\n")
@@ -57,7 +46,7 @@ def main():
     # ---- Step 2: Initialize collectors ----
     collectors = [
         CPUCollector(pgid),
-        GPUCollector(device_index=0)
+        GPUCollector(device_index=1)
     ]
 
     metrics_collector = MetricsCollector(collectors)
@@ -66,8 +55,12 @@ def main():
     buffer = RollingBuffer(WINDOW_SIZE)
     aggregator = Aggregator()
 
+    # ---- Step 4: Baseline + RCA ----
     baseline_model = BaselineModel()
     rca_analyzer = RCAAnalyzer(baseline_model)
+
+    baseline_phase = True
+    baseline_start_time = time.time()
 
     last_rca_time = time.time()
 
@@ -77,31 +70,46 @@ def main():
         while True:
             loop_start = time.time()
 
-            # 1. Collect snapshot
+            # ---- Collect ----
             snapshot = metrics_collector.collect()
-
-            # 2. Add to buffer
             buffer.add(snapshot)
 
-            # 3. RCA trigger
+            # ---- RCA Trigger ----
             if time.time() - last_rca_time >= RCA_INTERVAL:
 
                 features = aggregator.compute(buffer)
 
-                result = rca_analyzer.analyze(features)
+                # -------------------------------
+                # BASELINE PHASE
+                # -------------------------------
+                if baseline_phase:
+                    baseline_model.add(features)
+
+                    elapsed = time.time() - baseline_start_time
+                    print(f"📘 Baseline phase: {int(elapsed)} / {BASELINE_DURATION} sec")
+
+                    if elapsed >= BASELINE_DURATION:
+                        baseline_model.build()
+                        baseline_phase = False
+                        print("\n✅ Baseline established\n")
+
+                # -------------------------------
+                # RCA PHASE
+                # -------------------------------
+                else:
+                    result = rca_analyzer.analyze(features)
+
+                    print("\n🔍 RCA Result:")
+                    print(result)
 
                 last_rca_time = time.time()
 
-            # 4. Maintain sampling interval
+            # ---- Maintain 100 ms loop ----
             elapsed = time.time() - loop_start
             time.sleep(max(0, SAMPLING_INTERVAL - elapsed))
 
     except KeyboardInterrupt:
         print("\n🛑 Shutting down...")
-        print("🔻 Stopping vLLM...")
-        launcher.stop()
-        launcher.wait()
-        print("✅ Clean exit")
 
     finally:
         if launcher and launcher.is_running():
