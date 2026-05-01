@@ -15,7 +15,7 @@ class FaultInjector:
     # -----------------------------------
     # CPU STRESS
     # -----------------------------------
-    def start_cpu_stress(self, num_workers=2):
+    def start_cpu_stress(self, num_workers=50):
         def worker():
             while True:
                 _ = np.random.rand(300, 300) @ np.random.rand(300, 300)
