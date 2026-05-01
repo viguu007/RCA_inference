@@ -1,5 +1,6 @@
 # src/main.py
 
+import threading
 import time
 import os
 import sys
@@ -12,6 +13,7 @@ from src.launchers.vllm_launcher import VLLMLauncher
 from src.rca.baseline_model import BaselineModel
 from src.rca.rca_analyzer import RCAAnalyzer
 
+from src.utils.fault_injection.fault_orchestrator import FaultOrchestrator
 
 # ---- Config ----
 SAMPLING_INTERVAL = 0.1   # 100 ms
@@ -59,12 +61,18 @@ def main():
     baseline_model = BaselineModel()
     rca_analyzer = RCAAnalyzer(baseline_model)
 
+
     baseline_phase = True
     baseline_start_time = time.time()
 
     last_rca_time = time.time()
 
     print("📊 Monitoring started...\n")
+
+    # Fault orchestrator (runs in background)
+    fault_orchestrator = FaultOrchestrator()
+    fault_thread = threading.Thread(target=fault_orchestrator.run, daemon=True)
+    fault_thread.start()
 
     try:
         while True:

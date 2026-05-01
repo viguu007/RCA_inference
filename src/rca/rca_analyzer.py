@@ -13,7 +13,7 @@ class RCAAnalyzer:
     - CSV logging
     """
 
-    def __init__(self, baseline_model, z_threshold=3.0, csv_path="rca_results.csv"):
+    def __init__(self, baseline_model, z_threshold=5.0, csv_path="rca_results.csv"):
         self.baseline_model = baseline_model
         self.z_threshold = z_threshold
         self.csv_path = csv_path
